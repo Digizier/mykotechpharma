@@ -50,11 +50,14 @@ export default function HomePage() {
   const router = useRouter();
   const { addToCart } = useCart();
   
-  // Instantaneous 0ms initial state (zero skeleton flash on first paint)
+  // Fresh live cloud data state (with high-speed flash-skeleton during initial load)
   const [banners, setBanners] = useState<HeroBanner[]>(() => getCachedHeroBanners());
   const [categories, setCategories] = useState<Category[]>(() => getCachedCategories());
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>(() => getCachedFeaturedProducts());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(() => {
+    // If in-memory cache is empty, start in loading=true to show flash-skeleton
+    return getCachedHeroBanners().length === 0;
+  });
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
 
   // Hero Banner Slider State
@@ -68,6 +71,7 @@ export default function HomePage() {
   const [isCatPaused, setIsCatPaused] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     async function loadData() {
       try {
         const [b, c, p] = await Promise.all([
@@ -75,11 +79,16 @@ export default function HomePage() {
           getCategories(),
           getFeaturedProducts(8),
         ]);
-        if (b && b.length > 0) setBanners(b);
+        if (!isMounted) return;
+        if (b) setBanners(b);
         if (c && c.length > 0) setCategories(c);
-        if (p && p.length > 0) setFeaturedProducts(p);
+        if (p) setFeaturedProducts(p);
       } catch (e) {
         console.error(e);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     loadData();
@@ -89,6 +98,7 @@ export default function HomePage() {
     window.addEventListener('myko_categories_updated', handleUpdate);
     window.addEventListener('myko_banners_updated', handleUpdate);
     return () => {
+      isMounted = false;
       window.removeEventListener('myko_products_updated', handleUpdate);
       window.removeEventListener('myko_categories_updated', handleUpdate);
       window.removeEventListener('myko_banners_updated', handleUpdate);

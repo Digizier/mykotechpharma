@@ -84,7 +84,7 @@ export const DEFAULT_FALLBACK_BANNERS: HeroBanner[] = [
   },
 ];
 
-// Storage keys for Dual-Tier Persistence
+// Storage keys (only for client-specific non-volatile session data like store settings)
 export const KEYS = {
   SETTINGS: 'myko_store_settings',
   CATEGORIES: 'myko_cache_categories',
@@ -94,6 +94,16 @@ export const KEYS = {
   ORDERS: 'myko_cache_orders',
   COUPONS: 'myko_cache_coupons',
 };
+
+// Immediate client cleanup of stale legacy cached records
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem(KEYS.BANNERS);
+    localStorage.removeItem(KEYS.CATEGORIES);
+    localStorage.removeItem(KEYS.PRODUCTS);
+    localStorage.removeItem(KEYS.FEATURED);
+  } catch {}
+}
 
 // In-Memory High-Speed Cache & In-Flight Request Deduplication
 interface CacheEntry<T> {
@@ -115,7 +125,7 @@ const PENDING_PROMISES: {
   products?: Promise<Product[]>;
 } = {};
 
-const TTL_MS = 5 * 60 * 1000; // 5 minutes in-memory cache
+const TTL_MS = 2 * 60 * 1000; // 2 minutes lean in-memory session cache
 
 export function clearClientMemoryCache() {
   delete MEMORY_CACHE.categories;
@@ -125,20 +135,11 @@ export function clearClientMemoryCache() {
 }
 
 /**
- * Synchronous Fast Getters (Instant 0ms First Paint, Zero Skeleton Blink)
+ * Synchronous Fast Getters (Memory-only, zero stale localStorage data)
  */
 export function getCachedCategories(): Category[] {
   if (MEMORY_CACHE.categories?.data && MEMORY_CACHE.categories.data.length > 0) {
     return MEMORY_CACHE.categories.data;
-  }
-  if (typeof window !== 'undefined') {
-    try {
-      const local = localStorage.getItem(KEYS.CATEGORIES);
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
   }
   return DEFAULT_FALLBACK_CATEGORIES;
 }
@@ -147,30 +148,12 @@ export function getCachedHeroBanners(): HeroBanner[] {
   if (MEMORY_CACHE.banners?.data && MEMORY_CACHE.banners.data.length > 0) {
     return MEMORY_CACHE.banners.data;
   }
-  if (typeof window !== 'undefined') {
-    try {
-      const local = localStorage.getItem(KEYS.BANNERS);
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-  }
-  return DEFAULT_FALLBACK_BANNERS;
+  return [];
 }
 
 export function getCachedFeaturedProducts(): Product[] {
   if (MEMORY_CACHE.featured?.data && MEMORY_CACHE.featured.data.length > 0) {
     return MEMORY_CACHE.featured.data;
-  }
-  if (typeof window !== 'undefined') {
-    try {
-      const local = localStorage.getItem(KEYS.FEATURED) || localStorage.getItem(KEYS.PRODUCTS);
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, 8);
-      }
-    } catch {}
   }
   return [];
 }
@@ -239,13 +222,10 @@ export async function getCategories(forceRefresh = false): Promise<Category[]> {
         }));
 
         MEMORY_CACHE.categories = { data: combined, timestamp: Date.now() };
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(combined));
-        }
         return combined;
       }
     } catch (err) {
-      console.warn('Using local categories cache due to network status');
+      console.warn('Network issue fetching categories');
     } finally {
       delete PENDING_PROMISES.categories;
     }
@@ -381,13 +361,10 @@ export async function getFeaturedProducts(limit = 8, forceRefresh = false): Prom
 
       if (!error && data && data.length > 0) {
         MEMORY_CACHE.featured = { data: data as Product[], timestamp: Date.now() };
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(KEYS.FEATURED, JSON.stringify(data));
-        }
         return data as Product[];
       }
     } catch (err) {
-      console.warn('Falling back to cached featured products');
+      console.warn('Network issue fetching featured products');
     } finally {
       delete PENDING_PROMISES.featured;
     }
@@ -428,18 +405,14 @@ export async function getProducts(options?: {
       if (isDefaultQuery) {
         MEMORY_CACHE.products = { data, timestamp: Date.now() };
       }
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(data));
-      }
       return data;
     }
   } catch (err) {
-    console.warn('Falling back to local products cache');
+    console.warn('Network issue fetching products');
   }
 
-  if (typeof window !== 'undefined') {
-    const local = localStorage.getItem(KEYS.PRODUCTS);
-    if (local) return JSON.parse(local);
+  if (MEMORY_CACHE.products?.data) {
+    return MEMORY_CACHE.products.data;
   }
   return [];
 }
@@ -542,9 +515,6 @@ export async function getHeroBanners(forceRefresh = false): Promise<HeroBanner[]
 
       if (!error && data && data.length > 0) {
         MEMORY_CACHE.banners = { data, timestamp: Date.now() };
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(KEYS.BANNERS, JSON.stringify(data));
-        }
         return data;
       }
     } catch (e) {

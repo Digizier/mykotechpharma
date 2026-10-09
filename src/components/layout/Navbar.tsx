@@ -33,6 +33,32 @@ export const Navbar: React.FC = () => {
   });
   const [expandedMobileCatId, setExpandedMobileCatId] = useState<string | null>(null);
 
+  // Safe debounce timer for desktop category dropdown
+  const dropdownTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleOpenDropdown = () => {
+    if (dropdownTimerRef.current) {
+      clearTimeout(dropdownTimerRef.current);
+      dropdownTimerRef.current = null;
+    }
+    setCategoryDropdownOpen(true);
+  };
+
+  const handleCloseDropdown = (delay = 220) => {
+    if (dropdownTimerRef.current) {
+      clearTimeout(dropdownTimerRef.current);
+    }
+    dropdownTimerRef.current = setTimeout(() => {
+      setCategoryDropdownOpen(false);
+    }, delay);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (dropdownTimerRef.current) clearTimeout(dropdownTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     const loadCats = () => {
       getCategories()
@@ -180,8 +206,8 @@ export const Navbar: React.FC = () => {
             <div 
               id="category-dropdown-container"
               className="relative"
-              onMouseEnter={() => setCategoryDropdownOpen(true)}
-              onMouseLeave={() => setCategoryDropdownOpen(false)}
+              onMouseEnter={handleOpenDropdown}
+              onMouseLeave={() => handleCloseDropdown(300)}
             >
               <button
                 type="button"
@@ -196,15 +222,16 @@ export const Navbar: React.FC = () => {
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${categoryDropdownOpen ? 'rotate-180 text-blue-700' : ''}`} />
               </button>
 
-              {/* Mega Dropdown Menu (High z-50 to float in front of all page banners) */}
+              {/* Mega Dropdown Menu with zero gap and hover bridge */}
               {categoryDropdownOpen && (
                 <div 
-                  className="hidden lg:grid absolute top-full left-0 mt-2 w-[680px] bg-white rounded-3xl shadow-2xl border border-slate-200/90 p-4 grid-cols-5 gap-3 z-50 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/5"
-                  onMouseEnter={() => setCategoryDropdownOpen(true)}
-                  onMouseLeave={() => setCategoryDropdownOpen(false)}
+                  className="hidden lg:block absolute top-full left-0 pt-2 w-[680px] z-50 animate-in fade-in zoom-in-95 duration-150"
+                  onMouseEnter={handleOpenDropdown}
+                  onMouseLeave={() => handleCloseDropdown(300)}
                 >
-                  {/* Left Column: Categories List */}
-                  <div className="col-span-2 border-r border-slate-100 pr-2 space-y-1">
+                  <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-200/90 p-4 grid grid-cols-5 gap-3 ring-1 ring-black/5 before:content-[''] before:absolute before:-top-4 before:left-0 before:right-0 before:h-5">
+                    {/* Left Column: Categories List */}
+                    <div className="col-span-2 border-r border-slate-100 pr-2 space-y-1">
                     <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 py-1">
                       Therapeutic Categories
                     </div>
@@ -293,7 +320,8 @@ export const Navbar: React.FC = () => {
                     })()}
                   </div>
                 </div>
-              )}
+              </div>
+            )}
             </div>
 
             <Link
