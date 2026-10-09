@@ -1,3 +1,0 @@
-# SPA routing fallback for Cloudflare Pages
-/admin/*  /admin/index.html  200
-/products/*  /products/index.html  200
