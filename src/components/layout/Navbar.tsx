@@ -18,25 +18,28 @@ import {
   Pill
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
-import { getCategories } from '@/lib/db';
+import { getCategories, getCachedCategories } from '@/lib/db';
 import { Category } from '@/types';
 
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const { totalItems, openCart, settings } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(() => getCachedCategories());
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
-  const [hoveredCatId, setHoveredCatId] = useState<string | null>(null);
+  const [hoveredCatId, setHoveredCatId] = useState<string | null>(() => {
+    const initial = getCachedCategories();
+    return initial.length > 0 ? initial[0].id : null;
+  });
   const [expandedMobileCatId, setExpandedMobileCatId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadCats = () => {
       getCategories()
         .then((cats) => {
-          setCategories(cats);
-          if (cats.length > 0 && !hoveredCatId) {
-            setHoveredCatId(cats[0].id);
+          if (cats && cats.length > 0) {
+            setCategories(cats);
+            setHoveredCatId((prev) => prev || cats[0].id);
           }
         })
         .catch(console.error);
@@ -142,8 +145,13 @@ export const Navbar: React.FC = () => {
           <Link href="/" className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0 group">
             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-white shadow-md shadow-blue-500/15 group-hover:scale-105 transition-transform flex items-center justify-center p-0.5 border border-blue-100 shrink-0">
               <img
-                src="/logo.png"
+                src="/logo.webp"
                 alt="MykoTech Pharma Logo"
+                width={48}
+                height={48}
+                loading="eager"
+                fetchPriority="high"
+                decoding="sync"
                 className="w-full h-full object-contain"
               />
             </div>

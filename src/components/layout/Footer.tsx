@@ -76,8 +76,12 @@ export const Footer: React.FC = () => {
             <div className="flex items-center gap-2.5 sm:gap-3">
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden bg-white shadow-md flex items-center justify-center p-0.5 border border-blue-100 shrink-0">
                 <img
-                  src="/logo.png"
+                  src="/logo.webp"
                   alt="MykoTech Pharma"
+                  width={44}
+                  height={44}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-contain"
                 />
               </div>

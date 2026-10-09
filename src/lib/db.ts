@@ -27,20 +27,159 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   bank_iban: 'PK45MEZN0001234567890123',
 };
 
+// Default Fallback Categories for instantaneous (0ms) First Contentful Paint
+export const DEFAULT_FALLBACK_CATEGORIES: Category[] = [
+  {
+    id: '90717ee6-722e-4c5a-bb04-c8513fc50974',
+    name: 'Tablets',
+    slug: 'tablets',
+    description: 'Oral solid formulations, daily vitamins, pain relievers and therapeutic tablets',
+    icon: 'Pill',
+    display_order: 1,
+  },
+  {
+    id: 'b5dca6cd-1835-4fe6-996b-da4f6b5e4e7f',
+    name: 'Syrups',
+    slug: 'syrups',
+    description: 'Liquid oral suspensions, cough tonics, pediatric formulas and syrups',
+    icon: 'Droplet',
+    display_order: 2,
+  },
+  {
+    id: '9a9e16dd-f1d1-482e-8b8f-72ee5dd1ae28',
+    name: 'Drops',
+    slug: 'drops',
+    description: 'Pediatric drops, vitamin D3 infant solutions and ophthalmic preparations',
+    icon: 'Droplet',
+    display_order: 3,
+  },
+  {
+    id: 'c8228cac-6209-4260-9089-6221c9f800b4',
+    name: 'Food Supplements',
+    slug: 'food-supplements',
+    description: 'Nutritional wellness, multivitamin sachets, calcium and immunity enhancers',
+    icon: 'Sparkles',
+    display_order: 4,
+  },
+  {
+    id: 'f7145972-913a-4203-b731-182ebc34a46d',
+    name: 'Topical & Derma',
+    slug: 'topical-derma',
+    description: 'Dermatological creams, antiseptics, medicated washes and external treatments',
+    icon: 'Shield',
+    display_order: 5,
+  },
+];
+
+export const DEFAULT_FALLBACK_BANNERS: HeroBanner[] = [
+  {
+    id: 'default-hero',
+    title: 'MykoTech Pharma - Live long Live Happy!',
+    subtitle: 'Quality Medicines & Clinical Healthcare Delivered Across Pakistan',
+    cta_text: 'Explore Catalog',
+    cta_link: '/products/',
+    image_url: '/hero-banner.webp',
+    display_order: 1,
+    is_active: true,
+  },
+];
+
 // Storage keys for Dual-Tier Persistence
-const KEYS = {
+export const KEYS = {
   SETTINGS: 'myko_store_settings',
   CATEGORIES: 'myko_cache_categories',
   PRODUCTS: 'myko_cache_products',
+  FEATURED: 'myko_cache_featured',
   BANNERS: 'myko_cache_banners',
   ORDERS: 'myko_cache_orders',
   COUPONS: 'myko_cache_coupons',
 };
 
+// In-Memory High-Speed Cache & In-Flight Request Deduplication
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const MEMORY_CACHE: {
+  categories?: CacheEntry<Category[]>;
+  banners?: CacheEntry<HeroBanner[]>;
+  featured?: CacheEntry<Product[]>;
+  products?: CacheEntry<Product[]>;
+} = {};
+
+const PENDING_PROMISES: {
+  categories?: Promise<Category[]>;
+  banners?: Promise<HeroBanner[]>;
+  featured?: Promise<Product[]>;
+  products?: Promise<Product[]>;
+} = {};
+
+const TTL_MS = 5 * 60 * 1000; // 5 minutes in-memory cache
+
+export function clearClientMemoryCache() {
+  delete MEMORY_CACHE.categories;
+  delete MEMORY_CACHE.banners;
+  delete MEMORY_CACHE.featured;
+  delete MEMORY_CACHE.products;
+}
+
+/**
+ * Synchronous Fast Getters (Instant 0ms First Paint, Zero Skeleton Blink)
+ */
+export function getCachedCategories(): Category[] {
+  if (MEMORY_CACHE.categories?.data && MEMORY_CACHE.categories.data.length > 0) {
+    return MEMORY_CACHE.categories.data;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const local = localStorage.getItem(KEYS.CATEGORIES);
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+  }
+  return DEFAULT_FALLBACK_CATEGORIES;
+}
+
+export function getCachedHeroBanners(): HeroBanner[] {
+  if (MEMORY_CACHE.banners?.data && MEMORY_CACHE.banners.data.length > 0) {
+    return MEMORY_CACHE.banners.data;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const local = localStorage.getItem(KEYS.BANNERS);
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+  }
+  return DEFAULT_FALLBACK_BANNERS;
+}
+
+export function getCachedFeaturedProducts(): Product[] {
+  if (MEMORY_CACHE.featured?.data && MEMORY_CACHE.featured.data.length > 0) {
+    return MEMORY_CACHE.featured.data;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const local = localStorage.getItem(KEYS.FEATURED) || localStorage.getItem(KEYS.PRODUCTS);
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, 8);
+      }
+    } catch {}
+  }
+  return [];
+}
+
 /**
  * Dispatches cross-component and cross-tab update events
  */
 function emitUpdate(eventName: string) {
+  clearClientMemoryCache();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(eventName));
   }
@@ -68,42 +207,54 @@ export function saveStoreSettings(settings: StoreSettings): void {
 // -------------------------------------------------------------
 // 2. CATEGORIES & SUB-CATEGORIES
 // -------------------------------------------------------------
-export async function getCategories(): Promise<Category[]> {
-  try {
-    // 1. Fetch from Remote Cloud DB
-    const { data: cats, error: cErr } = await supabase
-      .from('categories')
-      .select('id, name, slug, description, icon, display_order')
-      .order('display_order', { ascending: true });
+export async function getCategories(forceRefresh = false): Promise<Category[]> {
+  const now = Date.now();
+  if (!forceRefresh && MEMORY_CACHE.categories && (now - MEMORY_CACHE.categories.timestamp < TTL_MS)) {
+    return MEMORY_CACHE.categories.data;
+  }
 
-    const { data: subCats, error: sErr } = await supabase
-      .from('sub_categories')
-      .select('id, category_id, name, slug, description, display_order')
-      .order('display_order', { ascending: true });
+  // Deduplicate inflight promise across concurrent callers (e.g. Navbar & HomePage)
+  if (PENDING_PROMISES.categories) {
+    return PENDING_PROMISES.categories;
+  }
 
-    if (!cErr && cats) {
-      // Map subcategories inside categories
-      const combined: Category[] = cats.map((cat) => ({
-        ...cat,
-        sub_categories: (subCats || []).filter((sc) => sc.category_id === cat.id),
-      }));
+  const promise = (async () => {
+    try {
+      // Fetch categories & subcategories in parallel
+      const [catsRes, subCatsRes] = await Promise.all([
+        supabase
+          .from('categories')
+          .select('id, name, slug, description, icon, display_order')
+          .order('display_order', { ascending: true }),
+        supabase
+          .from('sub_categories')
+          .select('id, category_id, name, slug, description, display_order')
+          .order('display_order', { ascending: true })
+      ]);
 
-      // Cache locally
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(combined));
+      if (!catsRes.error && catsRes.data && catsRes.data.length > 0) {
+        const combined: Category[] = catsRes.data.map((cat) => ({
+          ...cat,
+          sub_categories: (subCatsRes.data || []).filter((sc) => sc.category_id === cat.id),
+        }));
+
+        MEMORY_CACHE.categories = { data: combined, timestamp: Date.now() };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(combined));
+        }
+        return combined;
       }
-      return combined;
+    } catch (err) {
+      console.warn('Using local categories cache due to network status');
+    } finally {
+      delete PENDING_PROMISES.categories;
     }
-  } catch (err) {
-    console.warn('Using local categories cache due to network/DB status');
-  }
 
-  // 2. Fallback to LocalStorage
-  if (typeof window !== 'undefined') {
-    const local = localStorage.getItem(KEYS.CATEGORIES);
-    if (local) return JSON.parse(local);
-  }
-  return [];
+    return getCachedCategories();
+  })();
+
+  PENDING_PROMISES.categories = promise;
+  return promise;
 }
 
 export async function addCategory(categoryData: {
@@ -204,13 +355,61 @@ export async function deleteSubCategory(subId: string): Promise<void> {
 }
 
 // -------------------------------------------------------------
-// 3. PRODUCTS (Lean Projections & Zero Base64)
+// 3. PRODUCTS (Lean Projections & High-Speed In-Memory Cache)
 // -------------------------------------------------------------
+export async function getFeaturedProducts(limit = 8, forceRefresh = false): Promise<Product[]> {
+  const now = Date.now();
+  if (!forceRefresh && MEMORY_CACHE.featured && (now - MEMORY_CACHE.featured.timestamp < TTL_MS)) {
+    return MEMORY_CACHE.featured.data.slice(0, limit);
+  }
+
+  if (PENDING_PROMISES.featured) {
+    return PENDING_PROMISES.featured;
+  }
+
+  const promise = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(
+          'id, name, slug, generic_name, dosage, price, original_price, stock, thumbnail_url, gallery_urls, requires_prescription, is_featured, created_at'
+        )
+        .eq('is_active', true)
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (!error && data && data.length > 0) {
+        MEMORY_CACHE.featured = { data: data as Product[], timestamp: Date.now() };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(KEYS.FEATURED, JSON.stringify(data));
+        }
+        return data as Product[];
+      }
+    } catch (err) {
+      console.warn('Falling back to cached featured products');
+    } finally {
+      delete PENDING_PROMISES.featured;
+    }
+
+    return getCachedFeaturedProducts().slice(0, limit);
+  })();
+
+  PENDING_PROMISES.featured = promise;
+  return promise;
+}
+
 export async function getProducts(options?: {
   categorySlug?: string;
   subCategorySlug?: string;
   onlyActive?: boolean;
 }): Promise<Product[]> {
+  const isDefaultQuery = !options?.categorySlug && !options?.subCategorySlug && options?.onlyActive !== false;
+  const now = Date.now();
+  if (isDefaultQuery && MEMORY_CACHE.products && (now - MEMORY_CACHE.products.timestamp < TTL_MS)) {
+    return MEMORY_CACHE.products.data;
+  }
+
   try {
     let query = supabase
       .from('products')
@@ -226,6 +425,9 @@ export async function getProducts(options?: {
     const { data, error } = await query;
 
     if (!error && data) {
+      if (isDefaultQuery) {
+        MEMORY_CACHE.products = { data, timestamp: Date.now() };
+      }
       if (typeof window !== 'undefined') {
         localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(data));
       }
@@ -320,27 +522,41 @@ export async function deleteProduct(productId: string): Promise<void> {
 // -------------------------------------------------------------
 // 4. HERO BANNERS
 // -------------------------------------------------------------
-export async function getHeroBanners(): Promise<HeroBanner[]> {
-  try {
-    const { data, error } = await supabase
-      .from('hero_banners')
-      .select('*')
-      .order('display_order', { ascending: true })
-      .order('created_at', { ascending: true });
-
-    if (!error && data) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(KEYS.BANNERS, JSON.stringify(data));
-      }
-      return data;
-    }
-  } catch (e) {}
-
-  if (typeof window !== 'undefined') {
-    const local = localStorage.getItem(KEYS.BANNERS);
-    if (local) return JSON.parse(local);
+export async function getHeroBanners(forceRefresh = false): Promise<HeroBanner[]> {
+  const now = Date.now();
+  if (!forceRefresh && MEMORY_CACHE.banners && (now - MEMORY_CACHE.banners.timestamp < TTL_MS)) {
+    return MEMORY_CACHE.banners.data;
   }
-  return [];
+
+  if (PENDING_PROMISES.banners) {
+    return PENDING_PROMISES.banners;
+  }
+
+  const promise = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hero_banners')
+        .select('*')
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        MEMORY_CACHE.banners = { data, timestamp: Date.now() };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(KEYS.BANNERS, JSON.stringify(data));
+        }
+        return data;
+      }
+    } catch (e) {
+    } finally {
+      delete PENDING_PROMISES.banners;
+    }
+
+    return getCachedHeroBanners();
+  })();
+
+  PENDING_PROMISES.banners = promise;
+  return promise;
 }
 
 export async function saveHeroBanner(bannerData: Partial<HeroBanner>): Promise<void> {

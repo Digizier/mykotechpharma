@@ -20,6 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="scroll-smooth">
+      <head>
+        <link rel="preload" href="/logo.webp" as="image" type="image/webp" fetchPriority="high" />
+        <link rel="preload" href="/hero-banner.webp" as="image" type="image/webp" fetchPriority="high" />
+      </head>
       <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden w-full max-w-full">
         <CartProvider>
           {children}

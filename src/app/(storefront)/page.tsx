@@ -3,7 +3,14 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getHeroBanners, getCategories, getProducts } from '@/lib/db';
+import { 
+  getHeroBanners, 
+  getCategories, 
+  getFeaturedProducts, 
+  getCachedHeroBanners, 
+  getCachedCategories, 
+  getCachedFeaturedProducts 
+} from '@/lib/db';
 import { Product, Category, HeroBanner } from '@/types';
 import { 
   Pill, 
@@ -42,10 +49,12 @@ const iconMap: Record<string, React.ReactNode> = {
 export default function HomePage() {
   const router = useRouter();
   const { addToCart } = useCart();
-  const [banners, setBanners] = useState<HeroBanner[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Instantaneous 0ms initial state (zero skeleton flash on first paint)
+  const [banners, setBanners] = useState<HeroBanner[]>(() => getCachedHeroBanners());
+  const [categories, setCategories] = useState<Category[]>(() => getCachedCategories());
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(() => getCachedFeaturedProducts());
+  const [loading, setLoading] = useState(false);
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
 
   // Hero Banner Slider State
@@ -61,19 +70,16 @@ export default function HomePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        setLoading(true);
         const [b, c, p] = await Promise.all([
           getHeroBanners(),
           getCategories(),
-          getProducts({ onlyActive: true }),
+          getFeaturedProducts(8),
         ]);
-        setBanners(b);
-        setCategories(c);
-        setFeaturedProducts(p.slice(0, 8));
+        if (b && b.length > 0) setBanners(b);
+        if (c && c.length > 0) setCategories(c);
+        if (p && p.length > 0) setFeaturedProducts(p);
       } catch (e) {
         console.error(e);
-      } finally {
-        setLoading(false);
       }
     }
     loadData();
@@ -288,6 +294,10 @@ export default function HomePage() {
                     alt={banner.title || 'MykoTech Pharma - Live long Live Happy!'}
                     className="w-full h-auto object-cover block"
                     loading={idx === 0 ? 'eager' : 'lazy'}
+                    fetchPriority={idx === 0 ? 'high' : 'auto'}
+                    decoding={idx === 0 ? 'sync' : 'async'}
+                    width={1920}
+                    height={730}
                   />
                 </Link>
               ))}
