@@ -463,16 +463,16 @@ export default function HomePage() {
           <div className="w-full aspect-[16/8] sm:aspect-[21/8] rounded-2xl sm:rounded-3xl bg-slate-100 flash-skeleton shadow-md" />
         ) : sliderProducts.length > 0 ? (
           <div
-            className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 border border-blue-900/40 select-none text-white group"
+            className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-md sm:shadow-lg bg-white border border-slate-200/90 select-none text-slate-900 group"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Ambient Medical Glow Background Effects */}
-            <div className="absolute -right-16 -top-16 w-80 h-80 bg-blue-600/25 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -left-16 -bottom-16 w-80 h-80 bg-cyan-600/20 rounded-full blur-3xl pointer-events-none" />
+            {/* Subtle Medical Background Accents */}
+            <div className="absolute -right-20 -top-20 w-80 h-80 bg-blue-50/70 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-sky-50/60 rounded-full blur-3xl pointer-events-none" />
 
             {/* Sliding Product Showcase Track */}
             <div
@@ -482,90 +482,116 @@ export default function HomePage() {
               {sliderProducts.map((product, idx) => (
                 <div
                   key={product.id || idx}
-                  className="w-full shrink-0 p-3.5 sm:p-7 lg:p-10 flex flex-col-reverse md:flex-row items-center justify-between gap-3.5 sm:gap-8 lg:gap-10 relative z-10"
+                  className="w-full shrink-0 relative z-10"
                 >
-                  {/* Left Column: Product Details & Direct CTAs */}
-                  <div className="w-full md:w-3/5 space-y-2 sm:space-y-4 text-center md:text-left">
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 sm:gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[10px] sm:text-xs font-bold tracking-wide uppercase">
-                        <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-cyan-400" />
-                        Featured Formulation
-                      </span>
-                      {product.requires_prescription && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[9px] sm:text-xs font-bold">
-                          <AlertCircle className="w-3 h-3 text-amber-400" />
-                          Prescription Required (Rx)
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <h2 className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-snug line-clamp-2">
-                        {product.name}
-                      </h2>
-                      <p className="text-blue-200/90 text-xs sm:text-sm font-semibold mt-0.5 sm:mt-1 line-clamp-1">
-                        {product.dosage || product.generic_name || 'Clinical Pharmaceutical Medicine'}
-                      </p>
-                    </div>
-
-                    <p className="text-slate-300 text-[11px] sm:text-xs lg:text-sm line-clamp-2 leading-relaxed max-w-xl mx-auto md:mx-0">
-                      {product.short_description || product.description || 'Genuine healthcare formulation sourced directly from authorized manufacturers under strict cold-chain compliance.'}
-                    </p>
-
-                    {/* Price and Stock Status */}
-                    <div className="flex items-baseline justify-center md:justify-start gap-2.5 pt-0.5">
-                      <span className="text-xl sm:text-2xl lg:text-3xl font-black text-white">
-                        Rs. {Number(product.price).toFixed(2)}
-                      </span>
-                      {product.original_price && Number(product.original_price) > Number(product.price) && (
-                        <span className="text-xs sm:text-sm text-slate-400 line-through">
-                          Rs. {Number(product.original_price).toFixed(2)}
-                        </span>
-                      )}
-                      <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-                        In Stock • Verified
-                      </span>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 sm:gap-3 pt-1">
-                      <button
-                        onClick={() => handleBuyNow(product)}
-                        className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-blue-600/30 transition-transform active:scale-95 cursor-pointer"
-                      >
-                        <Zap className="w-3.5 h-3.5 fill-current" />
-                        Buy Now
-                      </button>
-                      <button
-                        onClick={() => handleAddToCart(product)}
-                        className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-colors active:scale-95 cursor-pointer"
-                      >
-                        <ShoppingBag className="w-3.5 h-3.5" />
-                        {addedIds[product.id] ? 'Added!' : 'Add to Cart'}
-                      </button>
-                      <Link
-                        href={`/products/${product.slug}/`}
-                        className="px-2.5 py-1.5 text-blue-300 hover:text-white text-xs sm:text-sm font-semibold flex items-center gap-1 transition-colors"
-                      >
-                        Details <ArrowRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Clean Product Image Showcase */}
-                  <div className="w-full md:w-2/5 flex items-center justify-center">
+                  {/* MOBILE VIEW (md:hidden): Clean responsive product image & Blue Title only, all extra details hidden */}
+                  <div className="block md:hidden pt-4 pb-8 px-4">
                     <Link
                       href={`/products/${product.slug}/`}
-                      className="w-36 h-36 sm:w-56 sm:h-56 lg:w-68 lg:h-68 rounded-2xl sm:rounded-3xl bg-white p-3 sm:p-4 shadow-2xl flex items-center justify-center relative overflow-hidden group/img transition-transform hover:scale-105"
+                      className="flex flex-col items-center justify-center group/m"
                     >
-                      <img
-                        src={product.thumbnail_url || '/logo.png'}
-                        alt={product.name}
-                        loading={idx === 0 ? 'eager' : 'lazy'}
-                        fetchPriority={idx === 0 ? 'high' : 'auto'}
-                        className="w-full h-full object-contain drop-shadow-md"
-                      />
+                      <div className="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl bg-slate-50/80 border border-slate-100 p-3.5 flex items-center justify-center shadow-xs">
+                        <img
+                          src={product.thumbnail_url || '/logo.png'}
+                          alt={product.name}
+                          loading={idx === 0 ? 'eager' : 'lazy'}
+                          fetchPriority={idx === 0 ? 'high' : 'auto'}
+                          className="w-full h-full object-contain drop-shadow-sm group-hover/m:scale-105 transition-transform"
+                        />
+                      </div>
+                      <h2 className="mt-3 text-sm sm:text-base font-black text-blue-700 text-center line-clamp-2 px-2 max-w-xs group-hover/m:text-blue-800 transition-colors">
+                        {product.name}
+                      </h2>
                     </Link>
+                  </div>
+
+                  {/* DESKTOP VIEW (hidden md:flex): White Background, Bold Blue Title, Details, Action CTAs & Large Product Image */}
+                  <div className="hidden md:flex p-6 lg:p-10 pb-9 lg:pb-12 flex-row items-center justify-between gap-8 lg:gap-12">
+                    {/* Left Column: Product Details & Direct CTAs */}
+                    <div className="w-full md:w-3/5 space-y-3 lg:space-y-4 text-left">
+                      <div className="flex flex-wrap items-center justify-start gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold tracking-wide uppercase">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                          Featured Formulation
+                        </span>
+                        {product.requires_prescription && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                            Prescription Required (Rx)
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <Link href={`/products/${product.slug}/`}>
+                          <h2 className="text-2xl lg:text-3xl xl:text-4xl font-black text-blue-700 hover:text-blue-800 tracking-tight leading-tight line-clamp-2 transition-colors">
+                            {product.name}
+                          </h2>
+                        </Link>
+                        <p className="text-slate-500 text-sm lg:text-base font-semibold mt-1 line-clamp-1">
+                          {product.dosage || product.generic_name || 'Clinical Pharmaceutical Medicine'}
+                        </p>
+                      </div>
+
+                      <p className="text-slate-600 text-xs lg:text-sm line-clamp-2 leading-relaxed max-w-xl">
+                        {product.short_description || product.description || 'Genuine healthcare formulation sourced directly from authorized manufacturers under strict cold-chain compliance.'}
+                      </p>
+
+                      {/* Price and Stock Status */}
+                      <div className="flex items-baseline justify-start gap-3 pt-0.5">
+                        <span className="text-2xl lg:text-3xl font-black text-slate-900">
+                          Rs. {Number(product.price).toFixed(2)}
+                        </span>
+                        {product.original_price && Number(product.original_price) > Number(product.price) && (
+                          <span className="text-sm text-slate-400 line-through">
+                            Rs. {Number(product.original_price).toFixed(2)}
+                          </span>
+                        )}
+                        <span className="text-xs text-emerald-700 font-bold px-2.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200">
+                          In Stock • Verified
+                        </span>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center justify-start gap-3 pt-1.5">
+                        <button
+                          onClick={() => handleBuyNow(product)}
+                          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex items-center gap-2 shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <Zap className="w-4 h-4 fill-current" />
+                          Buy Now
+                        </button>
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold text-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <ShoppingBag className="w-4 h-4" />
+                          {addedIds[product.id] ? 'Added!' : 'Add to Cart'}
+                        </button>
+                        <Link
+                          href={`/products/${product.slug}/`}
+                          className="px-3 py-2 text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          Details <ArrowRight className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Prominent Large Product Image Showcase */}
+                    <div className="w-full md:w-2/5 flex items-center justify-center">
+                      <Link
+                        href={`/products/${product.slug}/`}
+                        className="w-72 h-72 md:w-80 md:h-80 lg:w-[380px] lg:h-[380px] rounded-3xl bg-slate-50/80 p-6 lg:p-8 border border-slate-100/90 shadow-sm hover:shadow-lg flex items-center justify-center relative overflow-hidden group/img transition-all"
+                      >
+                        <img
+                          src={product.thumbnail_url || '/logo.png'}
+                          alt={product.name}
+                          loading={idx === 0 ? 'eager' : 'lazy'}
+                          fetchPriority={idx === 0 ? 'high' : 'auto'}
+                          className="w-full h-full object-contain drop-shadow-md group-hover/img:scale-105 transition-transform duration-300"
+                        />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -578,7 +604,7 @@ export default function HomePage() {
                   type="button"
                   onClick={handlePrevSlide}
                   aria-label="Previous Product"
-                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-black/40 hover:bg-blue-600 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-80 transition-all z-20 cursor-pointer shadow-md"
+                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-blue-600 text-slate-700 hover:text-white border border-slate-200 shadow-md flex items-center justify-center opacity-70 group-hover:opacity-100 transition-all z-20 cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
@@ -586,7 +612,7 @@ export default function HomePage() {
                   type="button"
                   onClick={handleNextSlide}
                   aria-label="Next Product"
-                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-black/40 hover:bg-blue-600 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-80 transition-all z-20 cursor-pointer shadow-md"
+                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-blue-600 text-slate-700 hover:text-white border border-slate-200 shadow-md flex items-center justify-center opacity-70 group-hover:opacity-100 transition-all z-20 cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
@@ -604,8 +630,8 @@ export default function HomePage() {
                     aria-label={`Jump to product ${idx + 1}`}
                     className={`transition-all duration-300 rounded-full cursor-pointer ${
                       currentSlide === idx
-                        ? 'w-5 sm:w-7 h-1.5 sm:h-2 bg-blue-500 shadow-md ring-2 ring-white/90'
-                        : 'w-1.5 sm:w-2 h-1.5 sm:h-2 bg-white/50 hover:bg-white'
+                        ? 'w-6 sm:w-8 h-1.5 sm:h-2 bg-blue-600 shadow-sm ring-2 ring-blue-100'
+                        : 'w-1.5 sm:w-2 h-1.5 sm:h-2 bg-slate-300 hover:bg-slate-400'
                     }`}
                   />
                 ))}
