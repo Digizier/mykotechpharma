@@ -4,14 +4,13 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  getHeroBanners, 
   getCategories, 
   getFeaturedProducts, 
-  getCachedHeroBanners, 
+  getProducts,
   getCachedCategories, 
   getCachedFeaturedProducts 
 } from '@/lib/db';
-import { Product, Category, HeroBanner } from '@/types';
+import { Product, Category } from '@/types';
 import { 
   Pill, 
   ShieldCheck, 
@@ -23,15 +22,24 @@ import {
   Clock, 
   Award, 
   ChevronRight, 
-  ChevronLeft,
-  AlertCircle,
-  MessageCircle,
-  Star,
-  Zap,
-  Droplet,
-  Milk,
-  Syringe,
-  Shield
+  ChevronLeft, 
+  AlertCircle, 
+  MessageCircle, 
+  Star, 
+  Zap, 
+  Droplet, 
+  Milk, 
+  Syringe, 
+  Shield, 
+  Brain, 
+  Smile, 
+  Scissors, 
+  Activity, 
+  LayoutGrid, 
+  HeartHandshake, 
+  Stethoscope, 
+  PhoneCall,
+  Droplets
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { ProductCardSkeleton, Skeleton } from '@/components/common/Skeleton';
@@ -44,23 +52,49 @@ const iconMap: Record<string, React.ReactNode> = {
   Sparkles: <Sparkles className="w-6 h-6" />,
   Syringe: <Syringe className="w-6 h-6" />,
   Shield: <Shield className="w-6 h-6" />,
+  Smile: <Smile className="w-6 h-6" />,
+  Scissors: <Scissors className="w-6 h-6" />,
+  Activity: <Activity className="w-6 h-6" />,
+  Brain: <Brain className="w-6 h-6" />,
 };
+
+// Strategic Category Headings (Order requested by client)
+interface CategoryTab {
+  id: string;
+  label: string;
+  badge?: string;
+  icon: React.ElementType;
+  isSpecial?: boolean;
+}
+
+const CATEGORY_TABS: CategoryTab[] = [
+  { id: 'mind-care-clinic', label: 'Mind Care Clinic', badge: 'Psychology', icon: Brain, isSpecial: true },
+  { id: 'pharma', label: 'Pharma Products', badge: 'Allopathic', icon: Pill },
+  { id: 'nutra', label: 'Nutra Products', badge: 'Supplements', icon: Sparkles },
+  { id: 'dental', label: 'Dental Products', badge: 'Oral Care', icon: Smile },
+  { id: 'cosmetics', label: 'Medicated Cosmetics', badge: 'Derma', icon: Droplets },
+  { id: 'surgical', label: 'Surgical Products', badge: 'Clinical', icon: Scissors },
+  { id: 'equipments', label: 'Medical Equipments', badge: 'Devices', icon: Activity },
+  { id: 'all', label: 'All Formulations', badge: 'Explore', icon: LayoutGrid },
+];
 
 export default function HomePage() {
   const router = useRouter();
   const { addToCart } = useCart();
   
-  // Fresh live cloud data state (with high-speed flash-skeleton during initial load)
-  const [banners, setBanners] = useState<HeroBanner[]>(() => getCachedHeroBanners());
+  // Real-time live data state
   const [categories, setCategories] = useState<Category[]>(() => getCachedCategories());
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>(() => getCachedFeaturedProducts());
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(() => {
-    // If in-memory cache is empty, start in loading=true to show flash-skeleton
-    return getCachedHeroBanners().length === 0;
+    return getCachedFeaturedProducts().length === 0;
   });
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
 
-  // Hero Banner Slider State
+  // Active Category Headings Selection
+  const [selectedCategoryTab, setSelectedCategoryTab] = useState<string>('all');
+
+  // Top Product Screen (Auto-Advancing Slides) State
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -74,17 +108,17 @@ export default function HomePage() {
     let isMounted = true;
     async function loadData() {
       try {
-        const [b, c, p] = await Promise.all([
-          getHeroBanners(),
+        const [c, p, allP] = await Promise.all([
           getCategories(),
           getFeaturedProducts(8),
+          getProducts({ onlyActive: true }),
         ]);
         if (!isMounted) return;
-        if (b) setBanners(b);
         if (c && c.length > 0) setCategories(c);
-        if (p) setFeaturedProducts(p);
+        if (p && p.length > 0) setFeaturedProducts(p);
+        if (allP && allP.length > 0) setAllProducts(allP);
       } catch (e) {
-        console.error(e);
+        console.error('Error fetching homepage data:', e);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -96,43 +130,37 @@ export default function HomePage() {
     const handleUpdate = () => loadData();
     window.addEventListener('myko_products_updated', handleUpdate);
     window.addEventListener('myko_categories_updated', handleUpdate);
-    window.addEventListener('myko_banners_updated', handleUpdate);
     return () => {
       isMounted = false;
       window.removeEventListener('myko_products_updated', handleUpdate);
       window.removeEventListener('myko_categories_updated', handleUpdate);
-      window.removeEventListener('myko_banners_updated', handleUpdate);
     };
   }, []);
 
-  // Filter active banners or provide clean fallback
-  const displayBanners = banners.filter((b) => b.is_active !== false);
-  const activeBanners = displayBanners.length > 0 ? displayBanners : [
-    {
-      id: 'default-hero',
-      image_url: '/hero-banner.webp',
-      cta_link: '/products/',
-      title: 'MykoTech Pharma - Live long Live Happy!',
-    } as HeroBanner
-  ];
+  // Products to show in top running screen
+  const sliderProducts = useMemo(() => {
+    if (featuredProducts.length > 0) return featuredProducts;
+    if (allProducts.length > 0) return allProducts.slice(0, 8);
+    return [];
+  }, [featuredProducts, allProducts]);
 
-  // Auto-advance every 3 seconds to next banner if not paused/touched
+  // Auto-advance top product slider every 3.5 seconds
   useEffect(() => {
-    if (activeBanners.length <= 1 || isPaused) return;
+    if (sliderProducts.length <= 1 || isPaused) return;
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % activeBanners.length);
-    }, 3000);
+      setCurrentSlide((prev) => (prev + 1) % sliderProducts.length);
+    }, 3500);
     return () => clearInterval(interval);
-  }, [activeBanners.length, isPaused]);
+  }, [sliderProducts.length, isPaused]);
 
-  // Reset slide index if banners count changes
+  // Reset slide index if product count changes
   useEffect(() => {
-    if (currentSlide >= activeBanners.length) {
+    if (currentSlide >= sliderProducts.length) {
       setCurrentSlide(0);
     }
-  }, [activeBanners.length, currentSlide]);
+  }, [sliderProducts.length, currentSlide]);
 
-  // Touch Swipe Handlers for mobile users
+  // Touch Swipe Handlers for mobile users on top product slider
   const handleTouchStart = (e: React.TouchEvent) => {
     setIsPaused(true);
     setTouchStartX(e.targetTouches[0].clientX);
@@ -148,11 +176,9 @@ export default function HomePage() {
       const distance = touchStartX - touchEndX;
       const minSwipeDistance = 40;
       if (distance > minSwipeDistance) {
-        // Swiped left -> move to next banner
-        setCurrentSlide((prev) => (prev + 1) % activeBanners.length);
+        setCurrentSlide((prev) => (prev + 1) % sliderProducts.length);
       } else if (distance < -minSwipeDistance) {
-        // Swiped right -> move to previous banner
-        setCurrentSlide((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
+        setCurrentSlide((prev) => (prev - 1 + sliderProducts.length) % sliderProducts.length);
       }
     }
     setTouchStartX(null);
@@ -163,22 +189,136 @@ export default function HomePage() {
   const handlePrevSlide = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setCurrentSlide((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
+    setCurrentSlide((prev) => (prev - 1 + sliderProducts.length) % sliderProducts.length);
   };
 
   const handleNextSlide = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setCurrentSlide((prev) => (prev + 1) % activeBanners.length);
+    setCurrentSlide((prev) => (prev + 1) % sliderProducts.length);
   };
 
-  // Infinite circular categories rotation: Tripled list creates an uninterrupted conveyor belt
+  // Dynamic Product Filter according to clicked Category Tab
+  const filteredProducts = useMemo(() => {
+    const listToFilter = allProducts.length > 0 ? allProducts : featuredProducts;
+    if (selectedCategoryTab === 'all') return listToFilter;
+
+    const findCategoryById = (catId?: string) => categories.find(c => c.id === catId);
+
+    return listToFilter.filter((product) => {
+      const cat = findCategoryById(product.category_id);
+      const catSlug = (cat?.slug || '').toLowerCase();
+      const catName = (cat?.name || '').toLowerCase();
+      const prodName = (product.name || '').toLowerCase();
+      const prodDesc = (product.description || '').toLowerCase();
+      const generic = (product.generic_name || '').toLowerCase();
+
+      if (selectedCategoryTab === 'pharma') {
+        // Allopathic: Tablets, Syrups, Drops, Injections
+        return (
+          catSlug.includes('tablet') ||
+          catSlug.includes('syrup') ||
+          catSlug.includes('drop') ||
+          catSlug.includes('inject') ||
+          catSlug.includes('pharma') ||
+          catName.includes('tablet') ||
+          catName.includes('syrup') ||
+          catName.includes('drop') ||
+          prodName.includes('tablet') ||
+          prodName.includes('syrup') ||
+          prodName.includes('drop') ||
+          prodName.includes('injection')
+        );
+      }
+
+      if (selectedCategoryTab === 'nutra') {
+        // Nutraceuticals, Supplements, Organic & Minerals
+        return (
+          catSlug.includes('supplement') ||
+          catSlug.includes('nutra') ||
+          catSlug.includes('organic') ||
+          catName.includes('supplement') ||
+          prodName.includes('sachet') ||
+          prodName.includes('capsule') ||
+          prodName.includes('nutra') ||
+          prodName.includes('vitamin') ||
+          prodName.includes('magnesium') ||
+          prodName.includes('iron') ||
+          prodName.includes('burn') ||
+          prodName.includes('calcium') ||
+          prodDesc.includes('organic') ||
+          generic.includes('vitamin')
+        );
+      }
+
+      if (selectedCategoryTab === 'dental') {
+        // Dental Products
+        return (
+          catSlug.includes('dental') ||
+          catName.includes('dental') ||
+          prodName.includes('dental') ||
+          prodName.includes('tooth') ||
+          prodName.includes('mouth') ||
+          prodName.includes('paste') ||
+          prodDesc.includes('dental')
+        );
+      }
+
+      if (selectedCategoryTab === 'cosmetics') {
+        // Medicated Cosmetics / Derma
+        return (
+          catSlug.includes('topical') ||
+          catSlug.includes('derma') ||
+          catSlug.includes('cosmetic') ||
+          catName.includes('derma') ||
+          catName.includes('topical') ||
+          prodName.includes('cream') ||
+          prodName.includes('lotion') ||
+          prodName.includes('gel') ||
+          prodName.includes('wash') ||
+          prodName.includes('derma') ||
+          prodDesc.includes('skin')
+        );
+      }
+
+      if (selectedCategoryTab === 'surgical') {
+        // Surgical Products
+        return (
+          catSlug.includes('surgical') ||
+          catName.includes('surgical') ||
+          prodName.includes('surgical') ||
+          prodName.includes('bandage') ||
+          prodName.includes('gauge') ||
+          prodName.includes('cannula') ||
+          prodName.includes('syringe') ||
+          prodDesc.includes('surgical')
+        );
+      }
+
+      if (selectedCategoryTab === 'equipments') {
+        // Medical Equipments
+        return (
+          catSlug.includes('equipment') ||
+          catName.includes('equipment') ||
+          prodName.includes('monitor') ||
+          prodName.includes('meter') ||
+          prodName.includes('nebulizer') ||
+          prodName.includes('apparatus') ||
+          prodName.includes('device') ||
+          prodDesc.includes('equipment')
+        );
+      }
+
+      return true;
+    });
+  }, [selectedCategoryTab, allProducts, featuredProducts, categories]);
+
+  // Infinite circular categories rotation for bottom marquee
   const infiniteCategories = useMemo(() => {
     if (categories.length === 0) return [];
     return [...categories, ...categories, ...categories];
   }, [categories]);
 
-  // Set initial scroll to the middle set so scrolling in either direction has buffer
   useEffect(() => {
     if (categories.length > 0 && categoryScrollRef.current) {
       const el = categoryScrollRef.current;
@@ -189,13 +329,11 @@ export default function HomePage() {
     }
   }, [categories.length]);
 
-  // Continuous non-stop glide (no static pause, no jumping backwards, endless rotation)
   useEffect(() => {
     if (categories.length === 0 || isCatPaused) return;
 
     let animId: number;
     let lastTime = performance.now();
-    // Gentle, steady readable glide speed (~32px per second)
     const pixelsPerSecond = 32;
 
     const animate = (currentTime: number) => {
@@ -205,8 +343,6 @@ export default function HomePage() {
       const el = categoryScrollRef.current;
       if (el) {
         el.scrollLeft += pixelsPerSecond * delta;
-
-        // Invisible infinite wrap when 2nd set finishes
         const oneSetWidth = el.scrollWidth / 3;
         if (oneSetWidth > 0 && el.scrollLeft >= oneSetWidth * 2) {
           el.scrollLeft -= oneSetWidth;
@@ -220,7 +356,6 @@ export default function HomePage() {
     return () => cancelAnimationFrame(animId);
   }, [categories.length, isCatPaused]);
 
-  // Handle scroll boundaries during user touch swipe or drag
   const handleCategoryScroll = () => {
     const el = categoryScrollRef.current;
     if (!el || categories.length === 0) return;
@@ -250,14 +385,6 @@ export default function HomePage() {
     setTimeout(() => setIsCatPaused(false), 2500);
   };
 
-  const handleTouchStartCat = () => {
-    setIsCatPaused(true);
-  };
-
-  const handleTouchEndCat = () => {
-    setTimeout(() => setIsCatPaused(false), 1500);
-  };
-
   const handleAddToCart = (product: Product) => {
     addToCart(product, 1, true); // Opens slide-out drawer
     setAddedIds((prev) => ({ ...prev, [product.id]: true }));
@@ -267,101 +394,451 @@ export default function HomePage() {
   };
 
   const handleBuyNow = (product: Product) => {
-    addToCart(product, 1, false); // Does not open drawer
+    addToCart(product, 1, false);
     router.push('/checkout/');
   };
 
   return (
     <div className="space-y-6 sm:space-y-10 pb-8 sm:pb-12 w-full max-w-full overflow-x-hidden">
       
-      {/* 1. HERO BANNER SECTION (Touch-Swipeable 3s Auto-Advancing Responsive Carousel) */}
+      {/* 1. TOP RUNNING PRODUCT SCREEN / SLIDER (Replaces static banner with running product carousel) */}
       <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-2 sm:pt-4">
         {loading ? (
-          <div className="w-full aspect-[16/7] sm:aspect-[21/8] rounded-2xl sm:rounded-3xl bg-slate-100 flash-skeleton shadow-md" />
-        ) : (
+          <div className="w-full aspect-[16/8] sm:aspect-[21/8] rounded-2xl sm:rounded-3xl bg-slate-100 flash-skeleton shadow-md" />
+        ) : sliderProducts.length > 0 ? (
           <div
-            className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 bg-slate-950 border border-slate-200/80 group select-none"
+            className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 border border-blue-900/40 select-none text-white group"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Sliding Track */}
+            {/* Ambient Medical Glow Background Effects */}
+            <div className="absolute -right-16 -top-16 w-80 h-80 bg-blue-600/25 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -left-16 -bottom-16 w-80 h-80 bg-cyan-600/20 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Sliding Product Showcase Track */}
             <div
               className="flex transition-transform duration-700 ease-in-out w-full"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
             >
-              {activeBanners.map((banner, idx) => (
-                <Link
-                  key={banner.id || idx}
-                  href={banner.cta_link || '/products/'}
-                  className="w-full shrink-0 block relative cursor-pointer"
-                  tabIndex={currentSlide === idx ? 0 : -1}
+              {sliderProducts.map((product, idx) => (
+                <div
+                  key={product.id || idx}
+                  className="w-full shrink-0 p-4 sm:p-8 lg:p-10 flex flex-col-reverse md:flex-row items-center justify-between gap-6 sm:gap-10 relative z-10"
                 >
-                  <img
-                    src={banner.image_url || '/hero-banner.webp'}
-                    alt={banner.title || 'MykoTech Pharma - Live long Live Happy!'}
-                    className="w-full h-auto object-cover block"
-                    loading={idx === 0 ? 'eager' : 'lazy'}
-                    fetchPriority={idx === 0 ? 'high' : 'auto'}
-                    decoding={idx === 0 ? 'sync' : 'async'}
-                    width={1920}
-                    height={730}
-                  />
-                </Link>
+                  {/* Left Column: Product Details & Direct CTAs */}
+                  <div className="w-full md:w-3/5 space-y-3 sm:space-y-5 text-center md:text-left">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[11px] sm:text-xs font-bold tracking-wide uppercase">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                        Featured Formulation
+                      </span>
+                      {product.requires_prescription && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[10px] sm:text-xs font-bold">
+                          <AlertCircle className="w-3 h-3 text-amber-400" />
+                          Prescription Required (Rx)
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h2 className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight line-clamp-2">
+                        {product.name}
+                      </h2>
+                      <p className="text-blue-200/90 text-xs sm:text-base font-semibold mt-1 sm:mt-1.5 line-clamp-1">
+                        {product.dosage || product.generic_name || 'Clinical Pharmaceutical Medicine'}
+                      </p>
+                    </div>
+
+                    <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 leading-relaxed max-w-xl mx-auto md:mx-0">
+                      {product.short_description || product.description || 'Genuine healthcare formulation sourced directly from authorized manufacturers under strict cold-chain compliance.'}
+                    </p>
+
+                    {/* Price and Stock Status */}
+                    <div className="flex items-baseline justify-center md:justify-start gap-3 pt-1">
+                      <span className="text-2xl sm:text-3xl font-black text-white">
+                        Rs. {Number(product.price).toFixed(2)}
+                      </span>
+                      {product.original_price && Number(product.original_price) > Number(product.price) && (
+                        <span className="text-sm sm:text-base text-slate-400 line-through">
+                          Rs. {Number(product.original_price).toFixed(2)}
+                        </span>
+                      )}
+                      <span className="text-[11px] text-emerald-400 font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                        In Stock • Verified
+                      </span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 sm:gap-3.5 pt-2">
+                      <button
+                        onClick={() => handleBuyNow(product)}
+                        className="px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-transform active:scale-95 cursor-pointer"
+                      >
+                        <Zap className="w-4 h-4 fill-current" />
+                        Buy Now
+                      </button>
+                      <button
+                        onClick={() => handleAddToCart(product)}
+                        className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition-colors active:scale-95 cursor-pointer"
+                      >
+                        <ShoppingBag className="w-4 h-4" />
+                        {addedIds[product.id] ? 'Added!' : 'Add to Cart'}
+                      </button>
+                      <Link
+                        href={`/products/${product.slug}/`}
+                        className="px-3 py-2 text-blue-300 hover:text-white text-xs sm:text-sm font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        Details <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Clean Product Image Showcase */}
+                  <div className="w-full md:w-2/5 flex items-center justify-center">
+                    <Link
+                      href={`/products/${product.slug}/`}
+                      className="w-44 h-44 sm:w-60 sm:h-60 lg:w-72 lg:h-72 rounded-2xl sm:rounded-3xl bg-white p-4 shadow-2xl flex items-center justify-center relative overflow-hidden group/img transition-transform hover:scale-105"
+                    >
+                      <img
+                        src={product.thumbnail_url || '/logo.png'}
+                        alt={product.name}
+                        loading={idx === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={idx === 0 ? 'high' : 'auto'}
+                        className="w-full h-full object-contain drop-shadow-md"
+                      />
+                    </Link>
+                  </div>
+                </div>
               ))}
             </div>
 
-            {/* Previous & Next Arrow Controls (Visible if multiple banners) */}
-            {activeBanners.length > 1 && (
+            {/* Slider Navigation Arrows */}
+            {sliderProducts.length > 1 && (
               <>
                 <button
                   type="button"
                   onClick={handlePrevSlide}
-                  aria-label="Previous Banner"
-                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/75 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-70 hover:opacity-100 transition-all duration-200 z-20 cursor-pointer shadow-md"
+                  aria-label="Previous Product"
+                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-blue-600 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-80 transition-all z-20 cursor-pointer shadow-md"
                 >
                   <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <button
                   type="button"
                   onClick={handleNextSlide}
-                  aria-label="Next Banner"
-                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/75 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-70 hover:opacity-100 transition-all duration-200 z-20 cursor-pointer shadow-md"
+                  aria-label="Next Product"
+                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-blue-600 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-80 transition-all z-20 cursor-pointer shadow-md"
                 >
                   <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
               </>
             )}
 
-            {/* Indicator Dots / Bar */}
-            {activeBanners.length > 1 && (
+            {/* Indicator Dots */}
+            {sliderProducts.length > 1 && (
               <div className="absolute bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2 z-20">
-                {activeBanners.map((_, idx) => (
+                {sliderProducts.map((_, idx) => (
                   <button
                     key={idx}
                     type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setCurrentSlide(idx);
-                    }}
-                    aria-label={`Jump to banner ${idx + 1}`}
+                    onClick={() => setCurrentSlide(idx)}
+                    aria-label={`Jump to product ${idx + 1}`}
                     className={`transition-all duration-300 rounded-full cursor-pointer ${
                       currentSlide === idx
-                        ? 'w-6 sm:w-8 h-2 sm:h-2.5 bg-blue-600 shadow-md ring-2 ring-white/90'
-                        : 'w-2 sm:w-2.5 h-2 sm:h-2.5 bg-white/70 hover:bg-white'
+                        ? 'w-6 sm:w-8 h-2 sm:h-2.5 bg-blue-500 shadow-md ring-2 ring-white/90'
+                        : 'w-2 sm:w-2.5 h-2 sm:h-2.5 bg-white/50 hover:bg-white'
                     }`}
                   />
                 ))}
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </section>
 
-      {/* 2. INSTANT PRESCRIPTION UPLOAD BANNER */}
+      {/* 2. HORIZONTAL CATEGORY HEADINGS STRIP (Line mein seedhi headings with smooth scroll) */}
+      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-2 sm:p-3 border border-slate-200/90 shadow-sm">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 px-0.5 select-none scroll-smooth">
+            {CATEGORY_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = selectedCategoryTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedCategoryTab(tab.id)}
+                  className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? tab.isSpecial
+                        ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/25 scale-[1.02]'
+                        : 'bg-blue-600 text-white shadow-md shadow-blue-600/20 scale-[1.02]'
+                      : tab.isSpecial
+                        ? 'bg-teal-50/80 text-teal-800 hover:bg-teal-100 border border-teal-200/80'
+                        : 'bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${
+                    isActive ? 'text-white' : tab.isSpecial ? 'text-teal-600' : 'text-blue-600'
+                  }`} />
+                  <span className="whitespace-nowrap">{tab.label}</span>
+                  {tab.badge && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold hidden sm:inline-block ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. DYNAMIC CATEGORY VIEW (Shows Mind Care Clinic or Filtered Products Grid) */}
+      {selectedCategoryTab === 'mind-care-clinic' ? (
+        /* SPECIAL VIEW: MIND CARE CLINIC (Psychologist & Mental Health Services) */
+        <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="bg-gradient-to-br from-teal-900 via-teal-800 to-slate-900 rounded-2xl sm:rounded-3xl p-5 sm:p-9 text-white shadow-xl border border-teal-700/50 space-y-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-teal-700/50 pb-5">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/40 text-teal-300 text-xs font-bold uppercase tracking-wider">
+                  <Brain className="w-3.5 h-3.5 text-teal-300" />
+                  Clinical Psychology & Mental Wellness
+                </div>
+                <h3 className="text-xl sm:text-3xl font-black text-white">
+                  Mind Care Clinic — Clinical Psychological Counseling
+                </h3>
+                <p className="text-teal-100 text-xs sm:text-sm max-w-2xl">
+                  Consult certified Clinical Psychologists for evidence-based therapy, emotional wellness, anxiety, depression counseling, and behavioral development in a completely confidential environment.
+                </p>
+              </div>
+
+              {/* Action Buttons for Booking */}
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
+                <a
+                  href="https://wa.me/923184008718?text=Hello%20Mind%20Care%20Clinic,%20I%20would%20like%20to%20book%20a%20psychological%20counseling%20session."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 sm:px-5 sm:py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg flex items-center gap-2 transition-transform active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4 text-slate-950" />
+                  Book on WhatsApp
+                </a>
+                <a
+                  href="tel:03145200832"
+                  className="px-4 py-2.5 sm:px-5 sm:py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-colors"
+                >
+                  <PhoneCall className="w-4 h-4 text-teal-300" />
+                  Call: 0314-5200832
+                </a>
+              </div>
+            </div>
+
+            {/* 4 Pillars of Mind Care Clinic */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-white/10 border border-white/10 rounded-2xl p-4 space-y-2">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold">
+                  <Brain className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-sm text-white">Anxiety & Depression</h4>
+                <p className="text-[11px] sm:text-xs text-teal-100/90 leading-relaxed">
+                  Therapeutic intervention for panic, chronic stress, mood swings, and general anxiety disorders.
+                </p>
+              </div>
+
+              <div className="bg-white/10 border border-white/10 rounded-2xl p-4 space-y-2">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold">
+                  <HeartHandshake className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-sm text-white">Cognitive Behavioral Therapy</h4>
+                <p className="text-[11px] sm:text-xs text-teal-100/90 leading-relaxed">
+                  Scientifically proven CBT methodologies to rebuild positive cognitive and thought patterns.
+                </p>
+              </div>
+
+              <div className="bg-white/10 border border-white/10 rounded-2xl p-4 space-y-2">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold">
+                  <Smile className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-sm text-white">Child & Youth Psychology</h4>
+                <p className="text-[11px] sm:text-xs text-teal-100/90 leading-relaxed">
+                  Academic counseling, ADHD support, behavioral therapy, and emotional grooming for students.
+                </p>
+              </div>
+
+              <div className="bg-white/10 border border-white/10 rounded-2xl p-4 space-y-2">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-sm text-white">100% Confidential</h4>
+                <p className="text-[11px] sm:text-xs text-teal-100/90 leading-relaxed">
+                  Private one-on-one sessions maintaining complete ethical discretion and clinical privacy.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : (
+        /* PRODUCT GRID VIEW: FILTERED CATEGORY MEDICINES */
+        <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
+          <div className="flex items-end justify-between">
+            <div>
+              <span className="text-[11px] sm:text-xs font-black tracking-widest text-blue-600 uppercase">
+                {selectedCategoryTab === 'all' ? 'Complete Pharmacy Catalog' : 'Therapeutic Formulations'}
+              </span>
+              <h2 className="text-xl sm:text-3xl font-black text-slate-900 mt-0.5 sm:mt-1">
+                {CATEGORY_TABS.find(t => t.id === selectedCategoryTab)?.label || 'Pharmaceutical Medicines'}
+              </h2>
+            </div>
+            <Link
+              href="/products/"
+              className="text-blue-600 hover:text-blue-700 font-bold text-xs sm:text-sm flex items-center gap-1"
+            >
+              <span>Explore All ({filteredProducts.length})</span>
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+              {filteredProducts.map((product) => {
+                const isAdded = addedIds[product.id];
+                return (
+                  <div
+                    key={product.id}
+                    className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-100 hover:border-blue-200 shadow-xs hover:shadow-xl transition-all flex flex-col group relative"
+                  >
+                    {/* Rx Badge */}
+                    {product.requires_prescription && (
+                      <div className="absolute top-4 left-4 z-10 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[9px] sm:text-[10px] font-bold flex items-center gap-1">
+                        <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
+                        Rx
+                      </div>
+                    )}
+
+                    {/* Thumbnail Image */}
+                    <Link
+                      href={`/products/${product.slug}/`}
+                      className="w-full h-32 sm:h-44 rounded-xl bg-slate-50/80 flex items-center justify-center p-2.5 overflow-hidden relative"
+                    >
+                      <img
+                        src={product.thumbnail_url || '/logo.png'}
+                        alt={product.name}
+                        loading="lazy"
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </Link>
+
+                    {/* Content */}
+                    <div className="pt-2.5 sm:pt-3.5 flex-1 flex flex-col">
+                      <span className="text-[10px] sm:text-[11px] font-bold text-blue-600 block truncate">
+                        {product.dosage || 'Healthcare Product'}
+                      </span>
+
+                      <Link
+                        href={`/products/${product.slug}/`}
+                        className="font-bold text-slate-900 text-xs sm:text-base group-hover:text-blue-600 transition-colors mt-0.5 line-clamp-1"
+                      >
+                        {product.name}
+                      </Link>
+
+                      {/* Rating */}
+                      <div className="flex items-center gap-0.5 mt-1 text-amber-400">
+                        {Array.from({ length: 5 }).map((_, idx) => (
+                          <Star key={idx} className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
+                        ))}
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold ml-1">(5.0)</span>
+                      </div>
+
+                      {/* Price & Buy Now / Add to Cart */}
+                      <div className="mt-auto pt-2.5 sm:pt-3 border-t border-slate-100 space-y-1.5 sm:space-y-2">
+                        <div className="flex items-baseline justify-between">
+                          <div>
+                            <div className="text-sm sm:text-lg font-black text-slate-950">
+                              Rs. {Number(product.price).toFixed(2)}
+                            </div>
+                            {product.original_price && Number(product.original_price) > Number(product.price) && (
+                              <div className="text-[10px] sm:text-[11px] text-slate-400 line-through">
+                                Rs. {Number(product.original_price).toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quick Add Button */}
+                          <button
+                            onClick={() => handleAddToCart(product)}
+                            className={`p-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                              isAdded
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-900 hover:bg-blue-600 text-white'
+                            }`}
+                            title="Add to Cart"
+                          >
+                            {isAdded ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Added</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShoppingBag className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Add</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Buy Now Direct Button */}
+                        <button
+                          onClick={() => handleBuyNow(product)}
+                          className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                          <span>Buy Now</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Empty Category Notice with WhatsApp Direct Inquire */
+            <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <Pill className="w-6 h-6" />
+              </div>
+              <h4 className="text-base sm:text-lg font-black text-slate-900">
+                Formulations Available Upon Requisition
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+                All certified products in this category are stocked at our licensed central warehouse. Inquire directly with our pharmacist for quick pricing and delivery.
+              </p>
+              <a
+                href="https://wa.me/923184008718?text=Hello%20MykoTech%20Pharma,%20I%20am%20inquiring%20about%20products%20in%20this%20category."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md transition-transform active:scale-95"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Inquire via WhatsApp (0318-4008718)
+              </a>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 4. INSTANT PRESCRIPTION UPLOAD BANNER */}
       <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 rounded-2xl sm:rounded-3xl p-4 sm:p-7 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
           <div className="space-y-1.5 text-center md:text-left">
@@ -384,7 +861,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. THERAPEUTIC CATEGORIES (Responsive Continuous Auto-Slide Carousel: 3 on Mobile, 6 on Desktop) */}
+      {/* 5. CONTINUOUS THERAPEUTIC CATEGORIES GLIDE CAROUSEL */}
       <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-3 sm:space-y-5">
         <div className="flex items-center justify-between">
           <div>
@@ -392,12 +869,11 @@ export default function HomePage() {
               Shop by Category
             </span>
             <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-slate-900 mt-0.5">
-              Pharmaceutical Categories
+              Therapeutic Catalogues
             </h2>
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Previous & Next Scroll Arrow Buttons */}
             <button
               type="button"
               onClick={() => handleScrollCategories('left')}
@@ -443,8 +919,6 @@ export default function HomePage() {
             onScroll={handleCategoryScroll}
             onMouseEnter={() => setIsCatPaused(true)}
             onMouseLeave={() => setIsCatPaused(false)}
-            onTouchStart={handleTouchStartCat}
-            onTouchEnd={handleTouchEndCat}
             className="flex items-stretch gap-2 sm:gap-3 overflow-x-auto no-scrollbar py-1 select-none cursor-grab active:cursor-grabbing"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
@@ -461,25 +935,17 @@ export default function HomePage() {
                     if (icon.startsWith('http') || icon.startsWith('data:') || icon.startsWith('/')) {
                       return <img src={icon} alt={cat.name} className="w-full h-full object-contain" />;
                     }
-                    if (/\p{Emoji}/u.test(icon) || (icon.length <= 4 && !/^[A-Za-z]+$/.test(icon))) {
-                      return <span className="text-xl sm:text-2xl leading-none select-none">{icon}</span>;
-                    }
-                    return iconMap[icon] || <Pill className="w-5 h-5 sm:w-6 sm:h-6" />;
+                    if (iconMap[icon]) return iconMap[icon];
+                    return <Pill className="w-5 h-5 sm:w-6 sm:h-6" />;
                   })()}
                 </div>
                 <div className="w-full">
-                  <h4 className="font-extrabold text-slate-900 text-[11px] sm:text-xs md:text-sm group-hover:text-blue-600 transition-colors truncate">
+                  <span className="font-extrabold text-slate-800 text-[11px] sm:text-xs block group-hover:text-blue-600 transition-colors line-clamp-1">
                     {cat.name}
-                  </h4>
-                  {cat.sub_categories && cat.sub_categories.length > 0 ? (
-                    <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-0.5 block truncate">
-                      {cat.sub_categories.length} Subcategories
-                    </span>
-                  ) : (
-                    <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-0.5 block truncate">
-                      Formulations
-                    </span>
-                  )}
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] text-slate-400 block line-clamp-1 mt-0.5">
+                    Formulations
+                  </span>
                 </div>
               </Link>
             ))}
@@ -487,139 +953,7 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* 4. FEATURED PRODUCTS (Selco-style Grid: 4 Desktop / 2 Mobile) */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
-        <div className="flex items-end justify-between">
-          <div>
-            <span className="text-[11px] sm:text-xs font-black tracking-widest text-blue-600 uppercase">
-              Certified Formulations
-            </span>
-            <h2 className="text-xl sm:text-3xl font-black text-slate-900 mt-0.5 sm:mt-1">
-              Featured Medicines
-            </h2>
-          </div>
-          <Link
-            href="/products/"
-            className="text-blue-600 hover:text-blue-700 font-bold text-xs sm:text-sm flex items-center gap-1"
-          >
-            <span>Explore All</span>
-            <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <ProductCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-            {featuredProducts.map((product) => {
-              const isAdded = addedIds[product.id];
-              return (
-                <div
-                  key={product.id}
-                  className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-100 hover:border-blue-200 shadow-xs hover:shadow-xl transition-all flex flex-col group relative"
-                >
-                  {/* Rx Badge */}
-                  {product.requires_prescription && (
-                    <div className="absolute top-4 left-4 z-10 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[9px] sm:text-[10px] font-bold flex items-center gap-1">
-                      <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
-                      Rx
-                    </div>
-                  )}
-
-                  {/* Thumbnail Image */}
-                  <Link
-                    href={`/products/${product.slug}/`}
-                    className="w-full h-32 sm:h-44 rounded-xl bg-slate-50/80 flex items-center justify-center p-2.5 overflow-hidden relative"
-                  >
-                    <img
-                      src={product.thumbnail_url || '/logo.png'}
-                      alt={product.name}
-                      loading="lazy"
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </Link>
-
-                  {/* Content */}
-                  <div className="pt-2.5 sm:pt-3.5 flex-1 flex flex-col">
-                    <span className="text-[10px] sm:text-[11px] font-bold text-blue-600 block truncate">
-                      {product.dosage || 'Healthcare Product'}
-                    </span>
-
-                    <Link
-                      href={`/products/${product.slug}/`}
-                      className="font-bold text-slate-900 text-xs sm:text-base group-hover:text-blue-600 transition-colors mt-0.5 line-clamp-1"
-                    >
-                      {product.name}
-                    </Link>
-
-                    {/* Rating */}
-                    <div className="flex items-center gap-0.5 mt-1 text-amber-400">
-                      {Array.from({ length: 5 }).map((_, idx) => (
-                        <Star key={idx} className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
-                      ))}
-                      <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold ml-1">(5.0)</span>
-                    </div>
-
-                    {/* Price & Buy Now / Add to Cart */}
-                    <div className="mt-auto pt-2.5 sm:pt-3 border-t border-slate-100 space-y-1.5 sm:space-y-2">
-                      <div className="flex items-baseline justify-between">
-                        <div>
-                          <div className="text-sm sm:text-lg font-black text-slate-950">
-                            Rs. {Number(product.price).toFixed(2)}
-                          </div>
-                          {product.original_price && Number(product.original_price) > Number(product.price) && (
-                            <div className="text-[10px] sm:text-[11px] text-slate-400 line-through">
-                              Rs. {Number(product.original_price).toFixed(2)}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Quick Add Button */}
-                        <button
-                          onClick={() => handleAddToCart(product)}
-                          className={`p-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs ${
-                            isAdded
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-900 hover:bg-blue-600 text-white'
-                          }`}
-                          title="Add to Cart"
-                        >
-                          {isAdded ? (
-                            <>
-                              <Check className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Added</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShoppingBag className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Add</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Buy Now Direct Button */}
-                      <button
-                        onClick={() => handleBuyNow(product)}
-                        className="w-full py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
-                      >
-                        <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                        <span>Buy Now</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* 5. WHY CHOOSE MYKOTECH PHARMA */}
+      {/* 6. WHY CHOOSE MYKOTECH PHARMA (Trust Pillars) */}
       <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="bg-slate-900 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-10 shadow-xl grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-8">
           <div className="space-y-2 sm:space-y-3">

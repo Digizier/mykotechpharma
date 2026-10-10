@@ -182,8 +182,8 @@ export const Navbar: React.FC = () => {
               />
             </div>
             <div className="min-w-0">
-              <span className="text-base sm:text-2xl font-black tracking-tight text-slate-900 leading-none block truncate">
-                MYKOTECH<span className="text-blue-700">PHARMA</span>
+              <span className="text-base sm:text-2xl font-black tracking-tight text-blue-700 leading-none block truncate">
+                MYKOTECH PHARMA
               </span>
               <span className="text-[8px] sm:text-[10px] uppercase font-bold tracking-wider sm:tracking-widest text-slate-600 block mt-0.5 truncate">
                 Pvt Ltd &bull; Live long Live Happy!
@@ -417,8 +417,8 @@ export const Navbar: React.FC = () => {
                   <img src="/logo.png" alt="MykoTech Logo" className="w-full h-full object-contain" />
                 </div>
                 <div>
-                  <span className="font-black text-slate-900 text-sm block leading-none">
-                    MYKOTECH<span className="text-blue-700">PHARMA</span>
+                  <span className="font-black text-blue-700 text-sm block leading-none">
+                    MYKOTECH PHARMA
                   </span>
                   <span className="text-[10px] text-slate-500 font-semibold mt-0.5 block">
                     Menu & Healthcare Catalog

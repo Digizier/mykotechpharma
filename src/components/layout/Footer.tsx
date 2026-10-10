@@ -87,7 +87,7 @@ export const Footer: React.FC = () => {
               </div>
               <div>
                 <span className="text-xl sm:text-2xl font-black tracking-tight text-white leading-none block">
-                  MYKOTECH<span className="text-blue-400">PHARMA</span>
+                  MYKOTECH <span className="text-blue-400">PHARMA</span>
                 </span>
                 <span className="text-[10px] sm:text-[11px] text-blue-400 font-bold tracking-wider uppercase mt-0.5 block">
                   Pvt Ltd &bull; Live long Live Happy!
