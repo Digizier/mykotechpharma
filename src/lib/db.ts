@@ -207,7 +207,7 @@ export async function getCategories(forceRefresh = false): Promise<Category[]> {
       const [catsRes, subCatsRes] = await Promise.all([
         supabase
           .from('categories')
-          .select('id, name, slug, description, icon, display_order')
+          .select('id, name, slug, description, icon, display_order, show_in_headings, show_in_slider')
           .order('display_order', { ascending: true }),
         supabase
           .from('sub_categories')
@@ -243,6 +243,8 @@ export async function addCategory(categoryData: {
   description?: string;
   icon?: string;
   display_order?: number;
+  show_in_headings?: boolean;
+  show_in_slider?: boolean;
 }): Promise<Category | null> {
   const { data, error } = await supabase
     .from('categories')
@@ -255,6 +257,7 @@ export async function addCategory(categoryData: {
     throw new Error(error.message);
   }
 
+  delete MEMORY_CACHE.categories;
   emitUpdate('myko_categories_updated');
   return data;
 }
@@ -267,6 +270,8 @@ export async function updateCategory(
     description?: string;
     icon?: string;
     display_order?: number;
+    show_in_headings?: boolean;
+    show_in_slider?: boolean;
   }
 ): Promise<Category | null> {
   const { data, error } = await supabase
@@ -281,6 +286,7 @@ export async function updateCategory(
     throw new Error(error.message);
   }
 
+  delete MEMORY_CACHE.categories;
   emitUpdate('myko_categories_updated');
   return data;
 }
@@ -352,7 +358,7 @@ export async function getFeaturedProducts(limit = 8, forceRefresh = false): Prom
       const { data, error } = await supabase
         .from('products')
         .select(
-          'id, name, slug, generic_name, dosage, price, original_price, stock, thumbnail_url, gallery_urls, requires_prescription, is_featured, created_at'
+          'id, name, slug, generic_name, dosage, price, original_price, stock, thumbnail_url, gallery_urls, requires_prescription, is_featured, show_in_banner, banner_order, created_at'
         )
         .eq('is_active', true)
         .order('is_featured', { ascending: false })
@@ -376,6 +382,29 @@ export async function getFeaturedProducts(limit = 8, forceRefresh = false): Prom
   return promise;
 }
 
+export async function getBannerProducts(): Promise<Product[]> {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select(
+        'id, name, slug, generic_name, dosage, category_id, sub_category_id, price, original_price, stock, thumbnail_url, gallery_urls, short_description, description, composition, dosage_instructions, side_effects, requires_prescription, is_active, is_featured, show_in_banner, banner_order, created_at'
+      )
+      .eq('is_active', true)
+      .eq('show_in_banner', true)
+      .order('banner_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      return data as Product[];
+    }
+  } catch (err) {
+    console.warn('Network issue fetching banner products');
+  }
+
+  // Fallback to featured products if none explicitly marked for banner
+  return getFeaturedProducts(8);
+}
+
 export async function getProducts(options?: {
   categorySlug?: string;
   subCategorySlug?: string;
@@ -391,7 +420,7 @@ export async function getProducts(options?: {
     let query = supabase
       .from('products')
       .select(
-        'id, name, slug, generic_name, dosage, category_id, sub_category_id, price, original_price, stock, thumbnail_url, gallery_urls, short_description, description, composition, dosage_instructions, side_effects, requires_prescription, is_active, is_featured, created_at'
+        'id, name, slug, generic_name, dosage, category_id, sub_category_id, price, original_price, stock, thumbnail_url, gallery_urls, short_description, description, composition, dosage_instructions, side_effects, requires_prescription, is_active, is_featured, show_in_banner, banner_order, created_at'
       )
       .order('created_at', { ascending: false });
 

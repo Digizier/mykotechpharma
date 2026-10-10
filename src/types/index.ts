@@ -5,6 +5,8 @@ export interface Category {
   description?: string;
   icon?: string;
   display_order: number;
+  show_in_headings?: boolean;
+  show_in_slider?: boolean;
   created_at?: string;
   sub_categories?: SubCategory[];
 }
@@ -40,6 +42,8 @@ export interface Product {
   requires_prescription: boolean;
   is_active: boolean;
   is_featured: boolean;
+  show_in_banner?: boolean;
+  banner_order?: number;
   created_at?: string;
   category?: { name: string; slug: string };
   sub_category?: { name: string; slug: string };

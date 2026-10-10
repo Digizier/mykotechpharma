@@ -93,6 +93,9 @@ export default function AdminDashboardPage() {
   const [newCatSlug, setNewCatSlug] = useState('');
   const [newCatDesc, setNewCatDesc] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('💊');
+  const [newCatOrder, setNewCatOrder] = useState(1);
+  const [newCatShowHeadings, setNewCatShowHeadings] = useState(true);
+  const [newCatShowSlider, setNewCatShowSlider] = useState(true);
 
   const [subCatModalOpen, setSubCatModalOpen] = useState(false);
   const [parentCatId, setParentCatId] = useState('');
@@ -132,8 +135,8 @@ export default function AdminDashboardPage() {
       setLoading(true);
       const [p, c, b, o, rxRes] = await Promise.all([
         getProducts({ onlyActive: false }),
-        getCategories(),
-        getHeroBanners(),
+        getCategories(true),
+        getHeroBanners(true),
         getOrders(),
         supabase.from('prescriptions').select('*').order('created_at', { ascending: false }),
       ]);
@@ -217,6 +220,8 @@ export default function AdminDashboardPage() {
       requires_prescription: false,
       is_active: true,
       is_featured: false,
+      show_in_banner: false,
+      banner_order: 1,
     });
     setProductModalOpen(true);
   };
@@ -236,6 +241,8 @@ export default function AdminDashboardPage() {
       composition: p.composition || '',
       dosage_instructions: p.dosage_instructions || '',
       side_effects: p.side_effects || '',
+      show_in_banner: p.show_in_banner ?? false,
+      banner_order: p.banner_order ?? 1,
     });
     setProductModalOpen(true);
   };
@@ -259,6 +266,8 @@ export default function AdminDashboardPage() {
         composition: editingProduct.composition || '',
         dosage_instructions: editingProduct.dosage_instructions || '',
         side_effects: editingProduct.side_effects || '',
+        show_in_banner: editingProduct.show_in_banner ?? false,
+        banner_order: Number(editingProduct.banner_order) || 1,
       });
       setProductModalOpen(false);
       triggerToast('Medicine formulation saved successfully in cloud database!');
@@ -305,6 +314,9 @@ export default function AdminDashboardPage() {
     setNewCatSlug('');
     setNewCatDesc('');
     setNewCatIcon('💊');
+    setNewCatOrder(categories.length + 1);
+    setNewCatShowHeadings(true);
+    setNewCatShowSlider(true);
     setCategoryModalOpen(true);
   };
 
@@ -314,6 +326,9 @@ export default function AdminDashboardPage() {
     setNewCatSlug(cat.slug);
     setNewCatDesc(cat.description || '');
     setNewCatIcon(cat.icon || '💊');
+    setNewCatOrder(cat.display_order ?? 1);
+    setNewCatShowHeadings(cat.show_in_headings !== false);
+    setNewCatShowSlider(cat.show_in_slider !== false);
     setCategoryModalOpen(true);
   };
 
@@ -328,6 +343,9 @@ export default function AdminDashboardPage() {
           slug,
           description: newCatDesc.trim(),
           icon: newCatIcon,
+          display_order: Number(newCatOrder) || 1,
+          show_in_headings: newCatShowHeadings,
+          show_in_slider: newCatShowSlider,
         });
         triggerToast(`Category "${newCatName}" updated successfully!`);
       } else {
@@ -336,7 +354,9 @@ export default function AdminDashboardPage() {
           slug,
           description: newCatDesc.trim(),
           icon: newCatIcon,
-          display_order: categories.length + 1,
+          display_order: Number(newCatOrder) || (categories.length + 1),
+          show_in_headings: newCatShowHeadings,
+          show_in_slider: newCatShowSlider,
         });
         triggerToast('Category created successfully!');
       }
@@ -346,6 +366,9 @@ export default function AdminDashboardPage() {
       setNewCatSlug('');
       setNewCatDesc('');
       setNewCatIcon('💊');
+      setNewCatOrder(1);
+      setNewCatShowHeadings(true);
+      setNewCatShowSlider(true);
       refreshAll();
     } catch (err: any) {
       triggerError(err.message);
@@ -792,6 +815,7 @@ export default function AdminDashboardPage() {
                     <th className="py-3 px-4">Dosage / Formula</th>
                     <th className="py-3 px-4">Price</th>
                     <th className="py-3 px-4">Stock</th>
+                    <th className="py-3 px-4">Banner Slider</th>
                     <th className="py-3 px-4">Rx</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -842,6 +866,15 @@ export default function AdminDashboardPage() {
                         }`}>
                           {p.stock} units
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {p.show_in_banner ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-black text-[10px] bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs">
+                            🚀 Slide #{p.banner_order ?? 1}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-[11px] font-bold">—</span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         {p.requires_prescription ? (
@@ -920,7 +953,30 @@ export default function AdminDashboardPage() {
                             </span>
                           )}
                         </h4>
-                        <span className="text-[10px] text-slate-400">/{cat.slug} &bull; {cat.description || 'No description'}</span>
+                        <span className="text-[10px] text-slate-400 block">/{cat.slug} &bull; {cat.description || 'No description'}</span>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="text-[9px] font-black text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded">
+                            Order: {cat.display_order ?? 1}
+                          </span>
+                          {cat.show_in_headings !== false ? (
+                            <span className="px-1.5 py-0.5 rounded-md bg-teal-50 border border-teal-200 text-teal-700 font-extrabold text-[9px]">
+                              ✓ Top Headings Bar
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-400 font-bold text-[9px]">
+                              ✕ No Headings
+                            </span>
+                          )}
+                          {cat.show_in_slider !== false ? (
+                            <span className="px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-extrabold text-[9px]">
+                              ✓ Bottom Carousel
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-400 font-bold text-[9px]">
+                              ✕ No Carousel
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -1639,7 +1695,7 @@ export default function AdminDashboardPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-4 pt-5">
+                <div className="flex flex-wrap items-center gap-4 pt-5">
                   <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1659,6 +1715,30 @@ export default function AdminDashboardPage() {
                     />
                     <span>Featured ⭐</span>
                   </label>
+
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-blue-700 cursor-pointer bg-blue-50/80 px-2.5 py-1.5 rounded-xl border border-blue-200">
+                    <input
+                      type="checkbox"
+                      checked={editingProduct.show_in_banner || false}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, show_in_banner: e.target.checked })}
+                      className="rounded text-blue-600 h-4 w-4"
+                    />
+                    <span>Show in Top Banner Slider 🚀</span>
+                  </label>
+
+                  {editingProduct.show_in_banner && (
+                    <div className="flex items-center gap-1.5 bg-blue-100/70 px-2.5 py-1 rounded-xl border border-blue-300">
+                      <label className="text-xs font-bold text-blue-900 whitespace-nowrap">Slide Order #:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        value={editingProduct.banner_order ?? 1}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, banner_order: Number(e.target.value) || 1 })}
+                        className="w-14 px-2 py-0.5 text-xs font-black bg-white border border-blue-300 rounded-lg text-center text-blue-900"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1876,6 +1956,55 @@ export default function AdminDashboardPage() {
                     onUploadSuccess={(url) => setNewCatIcon(url)}
                     label="Upload Category Graphic (<50KB WebP)"
                   />
+                </div>
+              </div>
+
+              {/* Display Order & Homepage Placement */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                    <span>Display Order #</span>
+                    <span className="text-[10px] text-slate-400 font-medium">(Lower number displays first)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newCatOrder}
+                    onChange={(e) => setNewCatOrder(Number(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2 pt-1 border-t border-slate-200/60">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Homepage Visibility Toggles:
+                  </span>
+                  
+                  <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white border border-slate-200 hover:border-blue-400 cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newCatShowHeadings}
+                      onChange={(e) => setNewCatShowHeadings(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded-md border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-slate-800">Show in Top Headings Bar</span>
+                      <p className="text-[10px] text-slate-500 font-normal">Displays as a clickable tab directly under the top product slider</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white border border-slate-200 hover:border-emerald-400 cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newCatShowSlider}
+                      onChange={(e) => setNewCatShowSlider(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-slate-800">Show in Bottom Carousel Slider</span>
+                      <p className="text-[10px] text-slate-500 font-normal">Appears in the scrolling therapeutic categories carousel near footer</p>
+                    </div>
+                  </label>
                 </div>
               </div>
 
